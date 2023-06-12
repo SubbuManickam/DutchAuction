@@ -1,105 +1,62 @@
-import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
-import { expect } from "chai";
-import { ethers } from "hardhat";
+import { ethers } from 'hardhat';
+import { expect } from 'chai';
 
-describe("BasicDutchAuction", function () {
-  async function deployAuctionFixture() {
-    
-    const [owner, buyer1, buyer2] = await ethers.getSigners();
+describe('BasicDutchAuction', () => {
+  let auctionContract;
+  let seller;
+  let bidder1;
+  let bidder2;
 
-    const basicDutchAuctionFactory = await ethers.getContractFactory("BasicDutchAuction");
-    const basicDutchAuctionToken = await basicDutchAuctionFactory.deploy(100, 10, 10);
+  beforeEach(async () => {
+    const AuctionContract = await ethers.getContractFactory('BasicDutchAuction');
+    [seller, bidder1, bidder2] = await ethers.getSigners();
 
-    return { basicDutchAuctionToken, owner, buyer1, buyer2 };
-  }
+    const reservePrice = ethers.parseEther('1');
+    const numBlockAuctionOpen = 10;
+    const offerPriceDecrement = ethers.parseEther('0.1');
 
-  describe("Deployment", function () {
+    auctionContract = await AuctionContract.deploy(reservePrice, numBlockAuctionOpen, offerPriceDecrement);
 
-    it("Bid from the seller account", async function () {
-      const { basicDutchAuctionToken, owner } = await loadFixture(deployAuctionFixture);
-
-      expect(basicDutchAuctionToken.connect(owner.address).bid({value:200})).to.be.revertedWith('Sellers are not allowed to buy');
-    });
-
-    it("Bid from buyer account - Equal to the current price", async function () {
-      const { basicDutchAuctionToken, owner, buyer1 } = await loadFixture(deployAuctionFixture);
-
-      expect(basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 200 }));
-    });
-
-    it("Bid from buyer account - Less than the price", async function () {
-      const { basicDutchAuctionToken, owner, buyer1 } = await loadFixture(deployAuctionFixture);
-
-      expect(basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 20 })).to.be.revertedWith('Insufficient Value');
-    });
+    return {auctionContract, reservePrice, numBlockAuctionOpen, offerPriceDecrement, seller, bidder1, bidder2};
   });
 
-  describe("Auction Conclusion", function () {
-    it("Auction Concluded - bid from another buyer", async function () {
-      const { basicDutchAuctionToken, owner, buyer1 } = await loadFixture(deployAuctionFixture);
+  it('Seller should not be allowed to place a bid', async () => {
+    const bidAmount = ethers.parseEther('2.5');
 
-      basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 200 });
-      expect(basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 200 })).to.be.revertedWith('Auction Concluded');
-    });
-        
-        it("Auction Closed", async function () {
-        const { basicDutchAuctionToken, buyer1 } = await loadFixture(deployAuctionFixture);
-        
-        await time.increase(time.duration.hours(20));
-        expect(basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 200 })).to.be.revertedWith('Auction Closed');
-        });
-        
-        
-        it("Bid from buyer account - After the auction is closed", async function () {
-        const { basicDutchAuctionToken, buyer1 } = await loadFixture(deployAuctionFixture);
-        
-        await time.increase(time.duration.days(10));
-        
-        expect(basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 400 })).to.be.revertedWith('Auction Closed');
-        });
-        
-        it("Bid from buyer account - After the auction has been concluded", async function () {
-        const { basicDutchAuctionToken, owner, buyer1 } = await loadFixture(deployAuctionFixture);
-        
-        basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 400 });
-        
-        expect(basicDutchAuctionToken.connect(owner.address).bid({from: owner.address, value: 400 })).to.be.revertedWith('Auction Concluded');
-        });
-        
-        
-        it("Auction Concluded - Bid from buyer after auction is concluded", async function () {
-        const { basicDutchAuctionToken, buyer1 } = await loadFixture(deployAuctionFixture);
-        
-          // Move time forward to end the auction
-          await time.increase(time.duration.hours(10));
-        
-          expect(basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 200 })).to.be.revertedWith('Auction Concluded');
-        });
-        
-        it("Auction Closed - Bid from buyer after auction is closed", async function () {
-          const { basicDutchAuctionToken, buyer1 } = await loadFixture(deployAuctionFixture);
-          
-          // Move time forward to end the auction
-          await time.increase(time.duration.hours(20));
-        
-          expect(basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 200 })).to.be.revertedWith('Auction Closed');
-        });
-        });
-
-    describe("Refund Process", function () {
-        it("Refund process for winner", async function () {
-            const { basicDutchAuctionToken, owner, buyer1 } = await loadFixture(deployAuctionFixture);
-      
-            basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 200 });
-            expect(basicDutchAuctionToken.connect(buyer1.address).refundBid({from: buyer1.address })).to.be.revertedWith('You are the winning bidder');
-          });
-
-        it("Refund process for other buyers", async function () {
-            const { basicDutchAuctionToken, owner, buyer1, buyer2 } = await loadFixture(deployAuctionFixture);
-      
-            basicDutchAuctionToken.connect(buyer1.address).bid({from: buyer1.address, value: 200 });
-            expect(basicDutchAuctionToken.connect(buyer2.address).refundBid({from: buyer1.address }));
-          });
-    });
+    await expect(auctionContract.connect(seller).bid({ value: bidAmount })).to.be.revertedWith('Sellers are not allowed to buy');
   });
+
+  it('Insufficient amount should not be accepted', async () => {
+    const bidAmount = ethers.parseEther('1.5');
+
+    await expect(auctionContract.connect(bidder1).bid({ value: bidAmount })).to.be.revertedWith('Insufficient Amount');
+  });
+
+  it('Choose the winner based on the conditions', async () => {
+    const bidAmount = ethers.parseEther('2.5');
+
+    await auctionContract.connect(bidder1).bid({ value: bidAmount });
+    const winner = await auctionContract.winner();
+
+    expect(winner).to.equal(bidder1.address);
+  });
+
+  it('Conclude the auction after winner is chosen', async () => {
+    const amount1 = ethers.parseEther('2.5');
+    const amount2 = ethers.parseEther('2.5');
+
+    await auctionContract.connect(bidder1).bid({ value: amount1 });
+    await expect (auctionContract.connect(bidder2).bid({ value: amount2 })).to.be.revertedWith('Auction Concluded');
+  });
+
+  it('Transfer the bid amount to the seller when auction is over', async () => {
+    const bidAmount = ethers.parseEther('2.5');
+    const initialSellerBalance = await ethers.provider.getBalance(seller.address);
+
+    await auctionContract.connect(bidder1).bid({ value: bidAmount });
+    const newSellerBalance = await ethers.provider.getBalance(seller.address);
+
+    const expectedBalance = initialSellerBalance + bidAmount;
+    expect(newSellerBalance).to.equal(expectedBalance);
+  });
+});
