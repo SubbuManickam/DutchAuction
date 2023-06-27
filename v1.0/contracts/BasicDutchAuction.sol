@@ -27,12 +27,16 @@ contract BasicDutchAuction {
         initialPrice = _reservePrice + (_numBlocksAuctionOpen * _offerPriceDecrement);
         initialBlock = block.number;
         endBlock = block.number + numBlockAuctionOpen;
-        curPrice = initialPrice - ((block.number - initialBlock) * offerPriceDecrement);
+    }
+
+    function currentPrice() public view returns(uint256){
+        return initialPrice - ((block.number - initialBlock) * offerPriceDecrement);
     }
 
     function bid() public payable returns(address) {
         require(msg.sender != seller, "Sellers are not allowed to buy");
 
+        curPrice = currentPrice();
         buyer = msg.sender;
         bids[buyer] = msg.value;
         require(msg.value >= curPrice, "Insufficient Amount");

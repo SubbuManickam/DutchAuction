@@ -4,7 +4,7 @@ import { ethers } from "hardhat";
 
 describe("MintNFT Test", function () {
   async function deployAuctionFixture() {
-    
+
     const [owner, otherAccount] = await ethers.getSigners();
 
     const nftMintFactory = await ethers.getContractFactory("MintNFT");
@@ -34,43 +34,43 @@ describe("MintNFT Test", function () {
       const nftDutchAuctionFactory = await ethers.getContractFactory("NFTDutchAuction");
       const nftDutchAuctionToken = await nftDutchAuctionFactory.deploy(nftMintToken.getAddress(), 0, 1000, 10, 5);
 
-    describe("After minting - approve contract", function () {
-      it("Seller should not be allowed to place a bid", async function () {
-           expect(nftDutchAuctionToken.connect(owner).bid({value:200})).to.be.revertedWith('Sellers are not allowed to buy');
-      });
+      describe("After minting - approve contract", function () {
+        it("Seller should not be allowed to place a bid", async function () {
+          expect(nftDutchAuctionToken.connect(owner).bid({ value: 200 })).to.be.revertedWith('Sellers are not allowed to buy');
+        });
 
-      it("Bid cannot be placed without approval", async function () {
-         expect(nftDutchAuctionToken.connect(otherAccount).bid({value:200})).to.be.revertedWith('ERC721: caller is not token owner or approved');
-    });
+        it("Bid cannot be placed without approval", async function () {
+          expect(nftDutchAuctionToken.connect(otherAccount).bid({ value: 200 })).to.be.revertedWith('ERC721: caller is not token owner or approved');
+        });
 
-    it("Invalid NFT token id should not be approved", async function(){
-        return expect(nftMintToken.approve(nftDutchAuctionToken.getAddress(), 9)).to.be.revertedWith('ERC721: invalid token ID');
-    });
+        it("Invalid NFT token id should not be approved", async function () {
+          return expect(nftMintToken.approve(nftDutchAuctionToken.getAddress(), 9)).to.be.revertedWith('ERC721: invalid token ID');
+        });
 
-    it("Unauthorized approval should not be allowed", async function () {
-        return expect(nftMintToken.connect(otherAccount).approve(nftDutchAuctionToken.getAddress(),0)).to.be.revertedWith('ERC721: approve caller is not token owner or approved for all');
-    });
+        it("Unauthorized approval should not be allowed", async function () {
+          return expect(nftMintToken.connect(otherAccount).approve(nftDutchAuctionToken.getAddress(), 0)).to.be.revertedWith('ERC721: approve caller is not token owner or approved for all');
+        });
 
-    it("Approving with authorized owner access", async function () {
-        const approvalResult = await nftMintToken.approve(nftDutchAuctionToken.getAddress(), 0);
-        expect( nftMintToken.approve(nftDutchAuctionToken.getAddress(),1));
-        
-        describe("Bid after contract approval", function () {
+        it("Approving with authorized owner access", async function () {
+          const approvalResult = await nftMintToken.approve(nftDutchAuctionToken.getAddress(), 0);
+          expect(nftMintToken.approve(nftDutchAuctionToken.getAddress(), 1));
+
+          describe("Bid after contract approval", function () {
 
             it('Insufficient amount should not be accepted', async () => {
-                expect(nftDutchAuctionToken.connect(otherAccount).bid({value:2})).to.be.revertedWith('Insufficient Amount');
-              });
+              expect(nftDutchAuctionToken.connect(otherAccount).bid({ value: 2 })).to.be.revertedWith('Insufficient Amount');
+            });
 
             it('Conclude the auction after winner is chosen', async () => {
-                expect(nftDutchAuctionToken.connect(otherAccount).bid({from: otherAccount.address, value: 1200 }));
-                expect(nftDutchAuctionToken.connect(otherAccount).bid({from: otherAccount.address, value: 1200 })).to.be.revertedWith('Auction Concluded');
-              });
+              expect(nftDutchAuctionToken.connect(otherAccount).bid({ from: otherAccount.address, value: 1200 }));
+              expect(nftDutchAuctionToken.connect(otherAccount).bid({ from: otherAccount.address, value: 1200 })).to.be.revertedWith('Auction Concluded');
+            });
+          });
+
         });
-        
+      });
+
     });
-});
 
-});
-
-});
+  });
 });

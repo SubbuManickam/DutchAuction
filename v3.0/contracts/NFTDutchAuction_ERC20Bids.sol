@@ -7,32 +7,39 @@ interface MintNFTokens{
      function ownerOf(uint256 tokenId) external view returns(address owner);
 }
 
-contract NFTDutchAuction {
+interface MintERC20Tokens{
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 amount) external returns (bool);
+}
 
-    address payable public seller;
+contract NFTDutchAuction_ERC20Bids {
+
+    address payable immutable seller;
     address public currentOwner;
     address public buyer = address(0x0);
-    address public winner = address(0x0);
 
     uint256 immutable reservePrice;
     uint256 numBlockAuctionOpen;
     uint256 immutable offerPriceDecrement;
     uint256 immutable initialPrice;
     uint256 curPrice;
-    
+
     uint256 immutable initialBlock;
     uint256 endBlock;
 
     uint256 immutable nfTokenId;
     address immutable tokenAddress;
+    address immutable erc20TokenAddress;
     MintNFTokens mint;
+    MintERC20Tokens mintERC20;
 
-    mapping(address => uint256) public bids;
-
-    constructor(address _tokenAddress, uint256 _nfTokenId, uint256 _reservePrice, uint256 _numBlocksAuctionOpen, uint256 _offerPriceDecrement) {
-        tokenAddress = _tokenAddress;
-        nfTokenId = _nfTokenId;
+    constructor( address _erc20TokenAddress, address _erc721TokenAddress, uint256 _nftTokenId, uint256 _reservePrice, uint256 _numBlocksAuctionOpen, uint256 _offerPriceDecrement) {
+        tokenAddress = _erc721TokenAddress;
+        erc20TokenAddress = _erc20TokenAddress;
+        nfTokenId = _nftTokenId;
         mint = MintNFTokens(tokenAddress);
+        mintERC20 = MintERC20Tokens(erc20TokenAddress);
         reservePrice = _reservePrice;
         numBlockAuctionOpen = _numBlocksAuctionOpen;
         offerPriceDecrement = _offerPriceDecrement;
@@ -47,21 +54,21 @@ contract NFTDutchAuction {
         return initialPrice - ((block.number - initialBlock) * offerPriceDecrement);
     }
 
-    function bid() public payable returns(address) {
+    function bid(uint256 bidAmount) public payable returns(address) {
+        require(buyer == address(0x0), "Auction Concluded");
         require(msg.sender != seller, "Sellers are not allowed to buy");
 
         curPrice = currentPrice();
-        buyer = msg.sender;
-        bids[buyer] = msg.value;
-        require(msg.value >= curPrice, "Insufficient Amount");
-        require(winner == address(0x0), "Auction Concluded");
 
-        winner = msg.sender;
-        mint.safeTransferFrom(seller, winner, nfTokenId);
+        require(mintERC20.balanceOf(msg.sender) >= bidAmount, "Insufficient ERC20 Tokens in your account");
+        require(bidAmount >= curPrice, "Insufficient Amount");
 
-        seller.transfer(msg.value);
+        buyer = payable(msg.sender);
 
-        currentOwner = winner;
+        mint.safeTransferFrom(seller, buyer, nfTokenId);
+        mintERC20.transferFrom(buyer, seller, bidAmount);
+
+        currentOwner = buyer;
         return currentOwner;
     }
 
